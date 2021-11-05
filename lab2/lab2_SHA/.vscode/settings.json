@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "bitset": "cpp",
+        "string": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
+}
