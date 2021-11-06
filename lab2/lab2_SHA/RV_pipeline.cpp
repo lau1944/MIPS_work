@@ -148,10 +148,9 @@ class INSMem
 class ALU
 {
     public:
-        bitset<64> ALUresult;
+        bitset<64> result;
         bitset<64> make(AluOp aluOp, bitset<64> oprand1, bitset<64> oprand2)
         {
-            bitset<64> result;
             switch (aluOp) {
                 case Add: {
                     result = bitset<64>(oprand1.to_ulong() + oprand2.to_ulong());
@@ -427,15 +426,15 @@ int main()
             }
 
             // 更新
-            newState.MEM.ALUresult = aluResult;
-			newState.MEM.Rs = state.EX.Rs;
-			newState.MEM.Rt = state.EX.Rt;
+            newState.MEM.ALUresult    = aluResult;
+			newState.MEM.Rs           = state.EX.Rs;
+			newState.MEM.Rt           = state.EX.Rt;
 			newState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
-			newState.MEM.rd_mem = state.EX.rd_mem;
-			newState.MEM.wrt_mem = state.EX.wrt_mem;
-			newState.MEM.wrt_enable = state.EX.wrt_enable;
-			newState.MEM.nop = state.EX.nop;
-			newState.MEM.Store_data = state.EX.Read_data2;
+			newState.MEM.rd_mem       = state.EX.rd_mem;
+			newState.MEM.wrt_mem      = state.EX.wrt_mem;
+			newState.MEM.wrt_enable   = state.EX.wrt_enable;
+			newState.MEM.nop          = state.EX.nop;
+			newState.MEM.Store_data   = state.EX.Read_data2;
 
         } else {
             newState.MEM.nop = cur_exState.nop;
