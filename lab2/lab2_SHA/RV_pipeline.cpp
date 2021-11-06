@@ -443,7 +443,40 @@ int main()
         /* --------------------- ID stage --------------------- */
         bitset<1> aluOp;
         if (!cur_idState.nop) {
-            
+            bitset<32> instruction = cur_idState.Instr;
+            string instr_str = instruction.to_string();
+            bitset<1> isLoad = instr_str.substr(25, 7) == string("0000011");
+            bitset<1> isStore = instr_str.substr(25, 7) == string("0100011");
+            bitset<1> isRType = instr_str.substr(25, 7) == string("0110011");
+            bitset<1> isBranch = instr_str.substr(25, 7) == string("1100011");
+            bitset<1> isIType = instr_str.substr(25, 5) == string("00100") ||
+                instr_str.substr(25, 5) == string("11000");
+            bitset<1> wrtEnable = !(isStore.to_ulong() || isBranch.to_ulong()); 
+
+            bitset<5> rg1 = bitset<5>(instr_str.substr(21, 5));
+            bitset<5> rg2 = bitset<5>(instr_str.substr(16, 5));
+            newState.EX.Rs = rg1;
+			newState.EX.Rt = rg2;
+
+            if (isRType[0] == 1) {
+                if(instr_str.substr(17, 3) == string("000")) {
+                    if(instr_str.substr(0, 7) == string("0000000"))
+                        aluOp = bitset<1>(0);  //add
+                    else if(instr_str.substr(0, 7) == string("0100000"))
+                        aluOp = bitset<1>(1);  //sub
+                }
+            } else if (isStore[0] == 1 || isLoad[0] == 1) {
+                aluOp = bitset<1>(0); //sw or lw
+            }
+
+            newState.EX.alu_op = aluOp.to_ulong();
+
+            if (isIType.to_ulong()) {
+                // 目标 register forward
+                cur_exState.Wrt_reg_addr = rg2;
+            } else {
+                cur_exState.Wrt_reg_addr = bitset<5>(instr_str.substr(11, 5));
+            }
         }
 
 
