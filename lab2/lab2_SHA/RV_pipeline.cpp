@@ -4,6 +4,7 @@
 #include<bitset>
 #include<fstream>
 using namespace std;
+
 #define MemSize 1000 // memory size, in reality, the memory size should be 2^32, but for this lab, for the space resaon, we keep it as this large number, but the memory is still 32-bit addressable.
 
 struct IFStruct {
@@ -293,7 +294,7 @@ int main()
 			
              
     while (1) {
-        struct stateStruct newState = {};
+        struct stateStruct newState     = {};
         struct WBStruct pre_wbState     = state.WB;
         struct MEMStruct pre_memState   = state.MEM;
         struct EXStruct pre_exState     = state.EX;
@@ -302,18 +303,28 @@ int main()
 
         /* --------------------- WB stage --------------------- */
         if (!pre_wbState.nop && pre_wbState.wrt_enable) {
-            myRF.writeRF(pre_wbState.Rs, pre_wbState.Wrt_data);
+            // 写会寄存器内存
+            myRF.writeRF(pre_wbState.Wrt_reg_addr, pre_wbState.Wrt_data);
         }
 
         /* --------------------- MEM stage --------------------- */
-        struct WBStruct memState = { .nop = pre_exState.nop };
         if (!pre_memState.nop) {
-            if (pre_memState.wrt_mem && pre_memState.wrt_enable) 
+            if (pre_memState.wrt_mem) {
+                // 执行写入任务
                 myDataMem.writeDataMem(pre_memState.ALUresult, pre_memState.Store_data);
-            else if (pre_memState.rd_mem) 
-                bitset<64> readData = myDataMem.readDataMem(pre_memState.ALUresult);
+            } 
 
+            if (pre_memState.rd_mem) {
+                // 执行读取任务
+                bitset<64> results = myDataMem.readDataMem(pre_memState.ALUresult);
+                newState.WB.Wrt_data = results;
+            } else {
+                // forward ALU 结果至 WB
+                newState.WB.Wrt_data = state.MEM.ALUresult;
+            }
         }
+
+
 
         /* --------------------- EX stage --------------------- */
         if (!pre_exState.nop) {
