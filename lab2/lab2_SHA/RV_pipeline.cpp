@@ -309,9 +309,16 @@ int main()
 
         /* --------------------- MEM stage --------------------- */
         if (!pre_memState.nop) {
+
+            // MEM reslt forward to WB
+            if (pre_memState.Wrt_reg_addr == pre_wbState.Rt) {
+                pre_memState.Store_data = pre_wbState.Wrt_data;
+            }
+
             if (pre_memState.wrt_mem) {
                 // 执行写入任务
                 myDataMem.writeDataMem(pre_memState.ALUresult, pre_memState.Store_data);
+                newState.WB.Wrt_data = state.WB.Wrt_data;
             } 
 
             if (pre_memState.rd_mem) {
@@ -324,6 +331,13 @@ int main()
             }
         }
 
+
+        // 更新
+        newState.WB.Wrt_reg_addr = state.MEM.Wrt_reg_addr;
+		newState.WB.wrt_enable   = state.MEM.wrt_enable;
+		newState.WB.Rs           = state.MEM.Rs;
+		newState.WB.Rt           = state.MEM.Rt;
+		newState.WB.nop          = state.MEM.nop;
 
 
         /* --------------------- EX stage --------------------- */
