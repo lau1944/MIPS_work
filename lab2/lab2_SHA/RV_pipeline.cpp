@@ -336,7 +336,6 @@ int main()
     state.EX.alu_op = true;
     int cycle = 0;
 			
-             
     while (1) {
         struct stateStruct newState     = {};
         struct WBStruct cur_wbState     = state.WB;
@@ -530,12 +529,14 @@ int main()
             bitset<32> pc = cur_ifState.PC;
             bitset<32> instr = myInsMem
                 .readInstr(bitset<32>(pc.to_ulong()));
+            newState.ID.Instr = instr;    
             string instr_str = instr.to_string();
             isDone = instr == 0xffffffff;
 
             bitset<5> rg1 = bitset<5>(instr_str.substr(21, 5));
             bitset<5> rg2 = bitset<5>(instr_str.substr(16, 5));
             bitset<1> isBranch = instr_str.substr(25, 7) == string("1100011");        
+            
             
             if (isDone) {
                 cur_ifState.nop = 1;
@@ -545,7 +546,7 @@ int main()
             bitset<7> opcode = bitset<7>(instr_str.substr(26, 7));
 
             // Load-Add Stall
-            if (opcode.to_ulong() == 0) {
+            if (cur_exState.is_I_type && cur_exState.rd_mem && !cur_exState.nop && opcode.to_ulong() == 0) {
                 if (cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
                     newState.ID = cur_idState;
                 }
@@ -556,7 +557,8 @@ int main()
             }
 
                 // Load-Store Stall
-            if (opcode.to_ulong() == 43 && cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
+            if (cur_exState.is_I_type && !cur_exState.nop && opcode.to_ulong() == 43 
+                && cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
                 newState.ID = cur_idState;
             }
 
@@ -580,21 +582,20 @@ int main()
         bitset<5> rg1 = bitset<5>(instr_str.substr(21, 5));
         bitset<5> rg2 = bitset<5>(instr_str.substr(16, 5));
 
-        if (isDone) {
+        if (!isDone) {
             bitset<1> IsEq = (myRF.readRF(rg1).to_ulong() == myRF.readRF(rg2).to_ulong()) ? 1 : 0;
             //beq
             if (isBranch.to_ulong() == 1 && IsEq.to_ulong() == 1) {
-
-            } else {
-                if (!cur_idState.nop)
+                if (!cur_idState.nop) {
                     newState.IF.PC = state.IF.PC.to_ulong() + std::stoll(getOffsetFromInstr(instr_str));
-                else
+                } else {
                     newState.IF.PC = state.IF.PC.to_ulong() + 4;
-            }
+                }    
+            } 
         }
         newState.IF.nop = state.IF.nop;
 
-        if (opcode.to_ulong() == 0) {
+        if (cur_exState.is_I_type && cur_exState.rd_mem && !cur_exState.nop && opcode.to_ulong() == 0) {
             if (cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
                 newState.IF = cur_ifState;
             }
@@ -605,12 +606,12 @@ int main()
         }
 
             // Load-Store Stall
-        if (opcode.to_ulong() == 43 && cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
+        if (cur_exState.is_I_type && !cur_exState.nop && opcode.to_ulong() == 43 
+            && cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
             newState.IF = cur_ifState;
         }
 
         printState(newState, cycle); //print states after executing cycle 0, cycle 1, cycle 2 ... 
-
         cycle += 1;
         state = newState; /* The end of the cycle and updates the current state with the values calculated in this cycle */
 
