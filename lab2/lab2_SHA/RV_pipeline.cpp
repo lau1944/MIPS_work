@@ -292,9 +292,9 @@ void printState(stateStruct state, int cycle)
  */ 
 void memToEx(struct EXStruct exState, struct MEMStruct memState) {
     if (!memState.nop && memState.wrt_enable) {
-        if (exState.Wrt_reg_addr == memState.Rs) {
+        if (exState.Rs == memState.Wrt_reg_addr) {
             exState.Read_data1 = memState.ALUresult;
-        } else if (exState.Wrt_reg_addr == memState.Rt) {
+        } else if (exState.Rt == memState.Wrt_reg_addr) {
             exState.Read_data2 = memState.ALUresult;
         }
     }
@@ -305,9 +305,9 @@ void memToEx(struct EXStruct exState, struct MEMStruct memState) {
  */ 
 void wbToEx(struct EXStruct exState, struct WBStruct wbState) {
     if (!wbState.nop && wbState.wrt_enable) {
-        if (wbState.Rs == exState.Wrt_reg_addr) {
+        if (wbState.Wrt_reg_addr == exState.Rs) {
             exState.Read_data1 = wbState.Wrt_data;
-        } else if (wbState.Rt == exState.Wrt_reg_addr) {
+        } else if (wbState.Wrt_reg_addr == exState.Rt) {
             exState.Read_data2 = wbState.Wrt_data;
         }
     }
@@ -400,22 +400,24 @@ int main()
 
             // 减法指令
             else if (!cur_exState.is_I_type && cur_exState.alu_op == 0 && cur_exState.wrt_enable) {
-                // MEM forward to EX
-                memToEx(cur_exState, cur_memState);
 
-                // WB forward EX
+                // MEM forward EX
                 wbToEx(cur_exState, cur_wbState);
+
+                // EX forward to EX
+                memToEx(cur_exState, cur_memState);
 
                 aluResult = alu.make(Sub, cur_exState.Read_data1, cur_exState.Read_data2);
             }
 
             // load 指令
             else if (cur_exState.is_I_type && cur_exState.alu_op == 1 && cur_exState.wrt_enable) {
-                // MEM forward to EX
-                memToEx(cur_exState, cur_memState);
 
-                // WB forward EX
+                // MEM forward EX
                 wbToEx(cur_exState, cur_wbState);
+
+                // EX forward to EX
+                memToEx(cur_exState, cur_memState);
 
                 aluResult = alu.make(Load, cur_exState.Read_data1, cur_exState.Imm);
             }
@@ -423,11 +425,12 @@ int main()
 
             // store 指令
             else if (cur_exState.is_I_type && cur_exState.alu_op == 1 && !cur_exState.wrt_enable) {
-                // MEM forward to EX
-                memToEx(cur_exState, cur_memState);
 
-                // WB forward EX
+                // MEM forward EX
                 wbToEx(cur_exState, cur_wbState);
+
+                // EX forward to EX
+                memToEx(cur_exState, cur_memState);
 
                 aluResult = alu.make(Store, cur_exState.Read_data1, cur_exState.Imm);
             }
@@ -451,41 +454,51 @@ int main()
         bitset<1> aluOp;
         if (!cur_idState.nop) {
             bitset<32> instruction = cur_idState.Instr;
-            string instr_str = instruction.to_string();
-            bitset<1> isLoad = instr_str.substr(25, 7) == string("0000011");
-            bitset<1> isStore = instr_str.substr(25, 7) == string("0100011");
-            bitset<1> isRType = instr_str.substr(25, 7) == string("0110011");
+            string instr_str   = instruction.to_string();
+            bitset<1> isLoad   = instr_str.substr(25, 7) == string("0000011");
+            bitset<1> isStore  = instr_str.substr(25, 7) == string("0100011");
+            bitset<1> isRType  = instr_str.substr(25, 7) == string("0110011");
             bitset<1> isBranch = instr_str.substr(25, 7) == string("1100011");
-            bitset<1> isIType = instr_str.substr(25, 5) == string("00100") ||
-                instr_str.substr(25, 5) == string("11000");
+            bitset<1> isIType  = instr_str.substr(25, 5) == string("00100") ||
+                                instr_str.substr(25, 5) == string("11000");
             bitset<1> wrtEnable = !(isStore.to_ulong() || isBranch.to_ulong()); 
-
-            bitset<5> rg1 = bitset<5>(instr_str.substr(21, 5));
-            bitset<5> rg2 = bitset<5>(instr_str.substr(16, 5));
+            bitset<5> rg1  = bitset<5>(instr_str.substr(21, 5));
+            bitset<5> rg2  = bitset<5>(instr_str.substr(16, 5));
             newState.EX.Rs = rg1;
 			newState.EX.Rt = rg2;
 
-            if (isRType[0] == 1) {
+            // 获取 ALU type & Imm
+            if (isRType.to_ulong() == 1) {
                 if(instr_str.substr(17, 3) == string("000")) {
                     if(instr_str.substr(0, 7) == string("0000000"))
                         aluOp = bitset<1>(0);  //add
                     else if(instr_str.substr(0, 7) == string("0100000"))
                         aluOp = bitset<1>(1);  //sub
                 }
-            } else if (isStore[0] == 1 || isLoad[0] == 1) {
+            } else if (isStore.to_ulong() == 1 || isLoad.to_ulong() == 1) {
                 aluOp = bitset<1>(0); //sw or lw
             }
 
-            newState.EX.alu_op = aluOp.to_ulong();
-            newState.EX.Imm = bitset<64>(instr_str.substr(0, 16));
-
-            if (isIType.to_ulong()) {
+            if (isIType.to_ulong() == 1) {
                 // 目标 register forward
                 cur_exState.Wrt_reg_addr = rg2;
+                // 同步 Imm
+                newState.EX.Imm = bitset<64>(instr_str.substr(0, 11));
             } else {
                 cur_exState.Wrt_reg_addr = bitset<5>(instr_str.substr(11, 5));
             }
 
+            // 同步 Imm
+            if (isStore.to_ulong() == 1) {
+                newState.EX.Imm = bitset<64>(instr_str.substr(0, 12));
+            }
+
+            // 同步 Imm
+            if (isLoad.to_ulong() == 1) {
+                newState.EX.Imm = bitset<64>(instr_str.substr(20, 4) + instr_str.substr(0, 6));
+            }
+
+            newState.EX.alu_op     = aluOp.to_ulong();
             newState.EX.Read_data1 = myRF.readRF(rg1);
             newState.EX.Read_data2 = myRF.readRF(rg2);
             newState.EX.nop        = cur_idState.nop;
@@ -515,7 +528,8 @@ int main()
                 newState.EX.Wrt_reg_addr = bitset<5>("00000");
 
                 bitset<1> IsEq = (myRF.readRF(rg1).to_ulong() == myRF.readRF(rg2).to_ulong()) ? 1 : 0;
-                if (IsEq.to_ulong() == 1) {
+                // branch条件不成立, PC 重回 branch位置
+                if (IsEq.to_ulong() == 0) {
                     cur_ifState.PC = bitset<32>(cur_ifState.PC.to_ulong() - 4);
                 }
             }
@@ -526,9 +540,7 @@ int main()
 
         /* --------------------- IF stage --------------------- */
         if (!cur_ifState.nop) {
-            bitset<32> pc = cur_ifState.PC;
-            bitset<32> instr = myInsMem
-                .readInstr(bitset<32>(pc.to_ulong()));
+            bitset<32> instr = myInsMem.readInstr(cur_ifState.PC);
             newState.ID.Instr = instr;    
             string instr_str = instr.to_string();
             isDone = instr == 0xffffffff;
@@ -537,79 +549,56 @@ int main()
             bitset<5> rg2 = bitset<5>(instr_str.substr(16, 5));
             bitset<1> isBranch = instr_str.substr(25, 7) == string("1100011");        
             
-            
             if (isDone) {
                 cur_ifState.nop = 1;
-            }    
+            } else {
+                bitset<1> IsEq = (myRF.readRF(rg1).to_ulong() == myRF.readRF(rg2).to_ulong()) ? 1 : 0;
+                //beq
+                if (isBranch.to_ulong() == 1 && IsEq.to_ulong() == 1) {
+                    if (!cur_idState.nop) {
+                        newState.IF.PC = bitset<32>(state.IF.PC.to_ulong() + std::stoll(getOffsetFromInstr(instr_str)));
+                    } else {
+                        newState.IF.PC = bitset<32>(state.IF.PC.to_ulong() + 4);
+                    }    
+                } else {
+                    newState.IF.PC = bitset<32>(state.IF.PC.to_ulong() + 4);
+                }
+            }   
+
+            newState.IF.nop = state.IF.nop;
             newState.ID.nop = cur_ifState.nop;
 
             bitset<7> opcode = bitset<7>(instr_str.substr(26, 7));
 
-            // Load-Add Stall
-            if (cur_exState.is_I_type && cur_exState.rd_mem && !cur_exState.nop && opcode.to_ulong() == 0) {
-                if (cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
-                    newState.ID = cur_idState;
+            if (cur_exState.is_I_type && cur_exState.rd_mem && !cur_exState.nop) {
+             
+                if (opcode.to_ulong() == 0) {
+                    if (cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
+                        newState.ID = cur_idState;
+                        newState.IF = cur_ifState;
+                    }
+
+                    if (cur_exState.Rt == bitset<5>(instr_str.substr(16, 5))) {
+                        newState.ID = cur_idState;
+                        newState.IF = cur_ifState;
+                    }
                 }
-
-                if (cur_exState.Rt == bitset<5>(instr_str.substr(16, 5))) {
+                
+                if (opcode.to_ulong() == 43 
+                    && cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
                     newState.ID = cur_idState;
+                    newState.IF = cur_ifState;
                 }
-            }
-
-                // Load-Store Stall
-            if (cur_exState.is_I_type && !cur_exState.nop && opcode.to_ulong() == 43 
-                && cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
-                newState.ID = cur_idState;
-            }
-
-            bitset<1> IsEq = (myRF.readRF(rg1).to_ulong() == myRF.readRF(rg2).to_ulong()) ? 1 : 0;
-            if (isBranch.to_ulong() == 1 && IsEq.to_ulong() == 1 && !cur_idState.nop) {
-                newState.ID.nop = true;
             }
 
         } else {
-            newState.ID.nop = newState.IF.nop;
+            newState.ID.nop = cur_ifState.nop;
         }
 
         /* ------------------------------------------ */
 
         if (state.IF.nop && state.ID.nop && state.EX.nop && state.MEM.nop && state.WB.nop)
             break;
-
-        string instr_str = myInsMem.readInstr(state.IF.PC).to_string();
-        bitset<7> opcode = bitset<7>(cur_idState.Instr.to_string().substr(26, 7));
-        bitset<1> isBranch = instr_str.substr(25, 7) == string("1100011");
-        bitset<5> rg1 = bitset<5>(instr_str.substr(21, 5));
-        bitset<5> rg2 = bitset<5>(instr_str.substr(16, 5));
-
-        if (!isDone) {
-            bitset<1> IsEq = (myRF.readRF(rg1).to_ulong() == myRF.readRF(rg2).to_ulong()) ? 1 : 0;
-            //beq
-            if (isBranch.to_ulong() == 1 && IsEq.to_ulong() == 1) {
-                if (!cur_idState.nop) {
-                    newState.IF.PC = state.IF.PC.to_ulong() + std::stoll(getOffsetFromInstr(instr_str));
-                } else {
-                    newState.IF.PC = state.IF.PC.to_ulong() + 4;
-                }    
-            } 
-        }
-        newState.IF.nop = state.IF.nop;
-
-        if (cur_exState.is_I_type && cur_exState.rd_mem && !cur_exState.nop && opcode.to_ulong() == 0) {
-            if (cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
-                newState.IF = cur_ifState;
-            }
-
-            if (cur_exState.Rt == bitset<5>(instr_str.substr(16, 5))) {
-                newState.IF = cur_ifState;
-            }
-        }
-
-            // Load-Store Stall
-        if (cur_exState.is_I_type && !cur_exState.nop && opcode.to_ulong() == 43 
-            && cur_exState.Rt == bitset<5>(instr_str.substr(21, 5))) {
-            newState.IF = cur_ifState;
-        }
 
         printState(newState, cycle); //print states after executing cycle 0, cycle 1, cycle 2 ... 
         cycle += 1;
