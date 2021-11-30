@@ -97,15 +97,54 @@ public:
 		return predi == result;
 	}
 
+	void restart() {
+		rightCount = 0;
+		totalCount = 0;
+	}
+
 	float getAccuracy()
 	{
 		return float(rightCount) / float(totalCount);
 	}
 };
 
+// hex to bits
+const char* hex_char_to_bin(char c)
+{
+    switch(toupper(c))
+    {
+        case '0': return "0000";
+        case '1': return "0001";
+        case '2': return "0010";
+        case '3': return "0011";
+        case '4': return "0100";
+        case '5': return "0101";
+        case '6': return "0110";
+        case '7': return "0111";
+        case '8': return "1000";
+        case '9': return "1001";
+        case 'A': return "1010";
+        case 'B': return "1011";
+        case 'C': return "1100";
+        case 'D': return "1101";
+        case 'E': return "1110";
+        case 'F': return "1111";
+    }
+}
+
+std::string hex_str_to_bin_str(const std::string& hex)
+{
+    std::string bin;
+    for(unsigned i = 0; i != hex.length(); ++i)
+       bin += hex_char_to_bin(hex[i]);
+    return bin;
+}
+
 int main(int argc, char **argv)
 {
 	ResultTest resultTest = ResultTest();
+
+	vector<string> pcs;
 
 	// read config file
 	ifstream config;
@@ -127,78 +166,59 @@ int main(int argc, char **argv)
 	// read trace file
 	std::ifstream trace;
 	trace.open("trace.txt");
-	int entryIndex = 0;
 	// Init saturat counters
 	vector<Entry> saturatList(pow(k, m));
-	// PC to entry mapping
-	std::map<std::string, int> entries;
-	std::string line;
-	Entry *preEntry;
+	string line;
 
-	while (std::getline(trace, line))
+	while (getline(trace, line))
 	{
-		std::string pc = line.substr(0, line.size() - 3);
-		if (entries.find(pc) != entries.end())
-		{
-			preEntry = &saturatList[entries[pc]];
-		}
-		else
-		{
-			preEntry = &saturatList[entryIndex];
-			entries.insert(std::make_pair(pc, entryIndex++));
-		}
-		bool isTaken = line.substr(line.size() - 2, 1) == "1";
-		// test prediction
-		resultTest.test((*preEntry).isTaken(), isTaken);
-		// update entry
-		(*preEntry).update(isTaken);
+		pcs.push_back(line);
 	}
+
+	for (int l = 0; l < pcs.size(); l++) {
+		string line = pcs[l];
+		string pc_in_bits = hex_str_to_bin_str(line.substr(0, line.size() - 3));
+		long pc_index = bitset<32>(pc_in_bits.substr(32 - m, m)).to_ullong();	
+
+		Entry* entry = &saturatList[pc_index];
+		bool isTaken = line.substr(line.size() - 2, 1) == "1";
+		resultTest.test((*entry).isTaken(), isTaken);
+		(*entry).update(isTaken);
+	}
+
 
 	// write in file
 	for (int i = 0; i < saturatList.size(); i++)
 	{
-		out << saturatList[i].isTaken() << "\n";
+		out << (saturatList[i]).isTaken() << "\n";
 	}
 
-	cout << resultTest.getAccuracy() * 100. << "%" << endl;
-
+	cout << "Accuracy: " << resultTest.getAccuracy() * 100. << "%" << endl;
+	resultTest.restart();
 
 
 	// from m = 10 to 20, output loss rate
 	for (int m = 10; m <= 20; m++)
 	{
-		int mIndex = 0;
 		// Init saturat counters
 		vector<Entry> saturatList(pow(k, m));
-		// PC to entry mapping
-		std::map<std::string, int> entries;
-		std::string line;
-		Entry *preEntry;
 
-		while (std::getline(trace, line))
-		{
-			std::string pc = line.substr(0, line.size() - 3);
-			if (entries.find(pc) != entries.end())
-			{
-				preEntry = &saturatList[entries[pc]];
-			}
-			else
-			{
-				preEntry = &saturatList[mIndex];
-				entries.insert(std::make_pair(pc, mIndex++));
-			}
+		for (int l = 0; l < pcs.size(); l++) {
+			string line = pcs[l];
+			string pc_in_bits = hex_str_to_bin_str(line.substr(0, line.size() - 3));
+			long pc_index = bitset<32>(pc_in_bits.substr(32 - m, m)).to_ullong();	
+			Entry* entry = &saturatList[pc_index];
+
 			bool isTaken = line.substr(line.size() - 2, 1) == "1";
-			// test prediction
-			resultTest.test((*preEntry).isTaken(), isTaken);
-			// update entry
-			(*preEntry).update(isTaken);
+			resultTest.test((*entry).isTaken(), isTaken);
+			(*entry).update(isTaken);
 		}
 		loss_out << m << ":" << 1 - resultTest.getAccuracy() << "\n";
+		resultTest.restart();
 	}
-
-	preEntry = NULL;
 
 	loss_out.close();
 	out.close();
 	trace.close();
+
 }
