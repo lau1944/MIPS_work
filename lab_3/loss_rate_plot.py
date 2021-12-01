@@ -4,7 +4,7 @@ import numpy as np
 
 def plot(x, y):
     fig, ax = plt.subplots()
-    ax.scatter(x, y)
+    ax.plot(x, y)
     plt.show()
 
 

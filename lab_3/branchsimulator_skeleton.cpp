@@ -16,6 +16,7 @@ class Entry
 {
 private:
 	int state;
+	string pc;
 	/**
 	 * 状态机
 	 */
@@ -62,6 +63,14 @@ public:
 	{
 		this->state = StrongTaken;
 	}
+	void setReferPc(string pc)
+	{
+		this->pc = pc;
+	}
+	string getReferPc()
+	{
+		return this->pc;
+	}
 	bool isTaken()
 	{
 		return this->state == StrongTaken || this->state == WeakTaken;
@@ -97,7 +106,8 @@ public:
 		return predi == result;
 	}
 
-	void restart() {
+	void restart()
+	{
 		rightCount = 0;
 		totalCount = 0;
 	}
@@ -109,35 +119,51 @@ public:
 };
 
 // hex to bits
-const char* hex_char_to_bin(char c)
+const char *hex_char_to_bin(char c)
 {
-    switch(toupper(c))
-    {
-        case '0': return "0000";
-        case '1': return "0001";
-        case '2': return "0010";
-        case '3': return "0011";
-        case '4': return "0100";
-        case '5': return "0101";
-        case '6': return "0110";
-        case '7': return "0111";
-        case '8': return "1000";
-        case '9': return "1001";
-        case 'A': return "1010";
-        case 'B': return "1011";
-        case 'C': return "1100";
-        case 'D': return "1101";
-        case 'E': return "1110";
-        case 'F': return "1111";
-    }
+	switch (toupper(c))
+	{
+	case '0':
+		return "0000";
+	case '1':
+		return "0001";
+	case '2':
+		return "0010";
+	case '3':
+		return "0011";
+	case '4':
+		return "0100";
+	case '5':
+		return "0101";
+	case '6':
+		return "0110";
+	case '7':
+		return "0111";
+	case '8':
+		return "1000";
+	case '9':
+		return "1001";
+	case 'A':
+		return "1010";
+	case 'B':
+		return "1011";
+	case 'C':
+		return "1100";
+	case 'D':
+		return "1101";
+	case 'E':
+		return "1110";
+	case 'F':
+		return "1111";
+	}
 }
 
-std::string hex_str_to_bin_str(const std::string& hex)
+std::string hex_str_to_bin_str(const std::string &hex)
 {
-    std::string bin;
-    for(unsigned i = 0; i != hex.length(); ++i)
-       bin += hex_char_to_bin(hex[i]);
-    return bin;
+	std::string bin;
+	for (unsigned i = 0; i != hex.length(); ++i)
+		bin += hex_char_to_bin(hex[i]);
+	return bin;
 }
 
 int main(int argc, char **argv)
@@ -168,47 +194,70 @@ int main(int argc, char **argv)
 	trace.open("trace.txt");
 	// Init saturat counters
 	vector<Entry> saturatList(pow(k, m));
+	std::map<string, Entry*> entries;
 	string line;
+	int mIndex;
 
 	while (getline(trace, line))
 	{
 		pcs.push_back(line);
 	}
 
-	for (int l = 0; l < pcs.size(); l++) {
+	for (int l = 0; l < pcs.size(); l++)
+	{
 		string line = pcs[l];
 		string pc_in_bits = hex_str_to_bin_str(line.substr(0, line.size() - 3));
-		long pc_index = bitset<32>(pc_in_bits.substr(32 - m, m)).to_ullong();	
-
-		Entry* entry = &saturatList[pc_index];
+		string pc = pc_in_bits.substr(32 - m, m);
+		Entry *entry;
+		if (entries.find(pc) != entries.end())
+		{
+			entry = entries[pc];
+		}
+		else
+		{
+			entry = &saturatList[mIndex++];
+			entries.insert(make_pair(pc, entry));
+		}
+		(*entry).setReferPc(line.substr(0, line.size() - 3));
 		bool isTaken = line.substr(line.size() - 2, 1) == "1";
 		resultTest.test((*entry).isTaken(), isTaken);
 		(*entry).update(isTaken);
 	}
 
-
 	// write in file
-	for (int i = 0; i < saturatList.size(); i++)
+	map<string, Entry *>::iterator it = entries.begin();
+	while (it != entries.end())
 	{
-		out << (saturatList[i]).isTaken() << "\n";
+		out << it->second->getReferPc() << " : " << it->second->isTaken() << "\n";
+		it++;
 	}
 
 	cout << "Accuracy: " << resultTest.getAccuracy() * 100. << "%" << endl;
 	resultTest.restart();
-
 
 	// from m = 10 to 20, output loss rate
 	for (int m = 10; m <= 20; m++)
 	{
 		// Init saturat counters
 		vector<Entry> saturatList(pow(k, m));
+		int mIndex;
+		std::map<string, Entry *> entries;
 
-		for (int l = 0; l < pcs.size(); l++) {
+		for (int l = 0; l < pcs.size(); l++)
+		{
 			string line = pcs[l];
 			string pc_in_bits = hex_str_to_bin_str(line.substr(0, line.size() - 3));
-			long pc_index = bitset<32>(pc_in_bits.substr(32 - m, m)).to_ullong();	
-			Entry* entry = &saturatList[pc_index];
-
+			string pc = pc_in_bits.substr(32 - m, m);
+			Entry *entry;
+			if (entries.find(pc) != entries.end())
+			{
+				entry = entries[pc];
+			}
+			else
+			{
+				entry = &saturatList[mIndex++];
+				entries.insert(make_pair(pc, entry));
+			}
 			bool isTaken = line.substr(line.size() - 2, 1) == "1";
 			resultTest.test((*entry).isTaken(), isTaken);
 			(*entry).update(isTaken);
@@ -221,4 +270,5 @@ int main(int argc, char **argv)
 	out.close();
 	trace.close();
 
+	return 0;
 }
